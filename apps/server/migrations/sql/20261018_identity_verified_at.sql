@@ -1,0 +1,2 @@
+ALTER TABLE identity.users
+    ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE;

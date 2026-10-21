@@ -1,0 +1,22 @@
+[project]
+name = "server"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "email-delivery",
+]
+
+[tool.uv.workspace]
+members = [
+    "identity",
+    "lib/auth-token",
+    "migrations",
+    "lib/authz-helper",
+    "bff",
+    "lib/email-delivery",
+]
+
+[tool.uv.sources]
+email-delivery = { workspace = true }

@@ -1,0 +1,10 @@
+# --- uv & Python Specifics ---
+# Exclude the local virtual environment (vital for cross-platform compatibility)
+.venv/
+
+# --- Python Cache & Build Artifacts ---
+**/__pycache__/
+.pytest_cache/
+
+# --- IDEs & System Files ---
+.vscode/

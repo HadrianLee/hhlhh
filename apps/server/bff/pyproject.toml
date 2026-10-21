@@ -1,0 +1,23 @@
+[project]
+name = "bff"
+version = "0.1.0"
+description = "Cookie-based browser sessions and an identity-backed API gateway"
+readme = "README.md"
+authors = [
+    { name = "HadrianLee", email = "hadrian.lee996@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard]>=0.141.1",
+    "asyncpg>=0.30.0",
+    "sqlalchemy>=2.0.51",
+    "httpx>=0.28.1",
+    "cryptography>=50.0.0",
+]
+
+[project.scripts]
+bff = "bff:main"
+
+[build-system]
+requires = ["uv_build>=0.11.19,<0.12.0"]
+build-backend = "uv_build"

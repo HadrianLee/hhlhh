@@ -1,0 +1,18 @@
+[project]
+name = "email-delivery"
+version = "0.1.0"
+description = "Async email delivery through SMTP or Resend using a shared interface"
+readme = "README.md"
+authors = [
+    { name = "HadrianLee", email = "hadrian.lee996@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "aiosmtplib>=5.1.3",
+    "resend[async]>=2.50.0",
+    "pydantic[email]>=2.13.4",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.19,<0.12.0"]
+build-backend = "uv_build"

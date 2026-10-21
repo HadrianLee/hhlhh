@@ -1,0 +1,30 @@
+FROM python:3.13-slim AS builder
+
+COPY --from=ghcr.io/astral-sh/uv:0.11.19 /uv /usr/local/bin/uv
+
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
+WORKDIR /app
+
+COPY apps/server/pyproject.toml apps/server/uv.lock ./
+COPY apps/server/identity/pyproject.toml ./identity/pyproject.toml
+COPY apps/server/lib/auth-token/pyproject.toml ./lib/auth-token/pyproject.toml
+COPY apps/server/lib/authz-helper/pyproject.toml ./lib/authz-helper/pyproject.toml
+COPY apps/server/migrations/pyproject.toml ./migrations/pyproject.toml
+COPY apps/server/bff/pyproject.toml ./bff/pyproject.toml
+COPY apps/server/lib/email-delivery/pyproject.toml ./lib/email-delivery/pyproject.toml
+
+RUN uv sync --frozen --no-dev --package bff --no-install-workspace
+COPY apps/server/bff/src ./bff/src
+COPY apps/server/bff/README.md ./bff/README.md
+RUN uv sync --locked --no-dev --package bff --no-editable
+
+FROM python:3.13-slim AS runner
+RUN groupadd --gid 10002 bff \
+    && useradd --uid 10002 --gid bff --no-create-home --shell /usr/sbin/nologin bff
+WORKDIR /app
+COPY --from=builder /app/.venv /app/.venv
+ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+USER bff
+EXPOSE 8001
+ENTRYPOINT ["uvicorn", "bff.main:app"]
+CMD ["--host", "0.0.0.0", "--port", "8001", "--proxy-headers"]

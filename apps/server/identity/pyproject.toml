@@ -1,0 +1,31 @@
+[project]
+name = "identity"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "HadrianLee", email = "hadrian.lee996@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard]>=0.141.1",
+    "auth-token",
+    "authz-helper",
+    "email-delivery",
+    "asyncpg>=0.30.0",
+    "sqlalchemy>=2.0.51",
+    "joserfc>=1.7.5",
+    "webauthn>=3.0.1",
+]
+
+[project.scripts]
+identity = "identity:main"
+
+[build-system]
+requires = ["uv_build>=0.11.19,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+auth-token = { workspace = true }
+authz-helper = { workspace = true }
+email-delivery = { workspace = true }

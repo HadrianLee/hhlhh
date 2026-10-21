@@ -1,0 +1,18 @@
+# --- uv & Python Specifics ---
+**/venv/
+
+# --- Python Cache & Build Artifacts ---
+**/__pycache__/
+
+# --- Node / Frontend ---
+**/node_modules/
+**/dist/
+
+# --- IDEs & System Files ---
+**/.vscode/
+
+# --- Environment Variables & Secrets ---
+**/.env
+**/.env.local
+**/*.tfvars
+infra/nginx/certs/

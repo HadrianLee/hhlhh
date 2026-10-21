@@ -1,0 +1,31 @@
+# --- uv & Python Specifics ---
+**/venv/
+**/.venv/
+
+# --- Python Cache & Build Artifacts ---
+**/__pycache__/
+
+# --- Node / Frontend ---
+**/node_modules/
+**/dist/
+
+# --- Git & CI/CD ---
+**/.git/
+**/.gitignore
+
+# --- IDEs & System Files ---
+**/.vscode/
+
+# --- Docker & Documentation ---
+**/Dockerfile
+**/*docker-compose*.yml
+**/dockerignore
+**/README.md
+!apps/server/**/README.md
+**/docs/
+
+# --- Environment Variables & Secrets ---
+**/.env
+**/.env.local
+**/*.tfvars
+infra/nginx/certs/

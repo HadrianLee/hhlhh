@@ -1,0 +1,37 @@
+FROM node:24-bookworm-slim AS builder
+
+WORKDIR /apps/web
+
+COPY apps/web/package*.json ./
+RUN npm ci
+
+COPY apps/web/index.html ./
+COPY apps/web/vite.config.ts ./
+COPY apps/web/tsconfig*.json ./
+COPY apps/web/public ./public
+COPY apps/web/src ./src
+
+RUN npm run build
+
+FROM nginx:alpine
+
+RUN rm /etc/nginx/conf.d/default.conf
+
+COPY infra/nginx/nginx.conf /etc/nginx/nginx.conf
+COPY infra/nginx/security-headers.conf /etc/nginx/security-headers.conf
+COPY infra/nginx/templates/default.conf.template /etc/nginx/templates/default.conf.template
+COPY --chmod=755 infra/nginx/19-validate-environment.sh /docker-entrypoint.d/19-validate-environment.sh
+
+RUN chown -R nginx:nginx /etc/nginx/conf.d /var/cache/nginx
+
+ENV NGINX_ENVSUBST_FILTER="^(DOMAIN|BFF_SERVER_URL|SSL_CERT_PATH|SSL_KEY_PATH)$" \
+    BFF_SERVER_URL=http://bff:8001
+
+COPY --from=builder /apps/web/dist /usr/share/nginx/html
+
+USER nginx
+
+EXPOSE 8443
+
+ENTRYPOINT [ "/docker-entrypoint.sh" ]
+CMD [ "nginx", "-g", "daemon off;" ]

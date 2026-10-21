@@ -1,0 +1,158 @@
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:?Set POSTGRES_ADMIN_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Set POSTGRES_ADMIN_PASSWORD}
+      POSTGRES_DB: postgres
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  identity:
+    build:
+      context: ../..
+      dockerfile: apps/server/identity/dockerfile
+    restart: unless-stopped
+    init: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+        restart: true
+    environment:
+      # Required at identity startup; DB_URL must use postgres:5432/identity
+      # and the identity_app login. Passwords in URLs must be percent-encoded.
+      DB_URL:
+      JWT_ISSUER:
+      JWT_AUDIENCE:
+      IDENTITY_TOKEN_HMAC_KEY:
+      JWT_ACCESS_TOKEN_TTL_SECONDS: ${JWT_ACCESS_TOKEN_TTL_SECONDS:-900}
+      JWT_KEY_ROTATION_INTERVAL_SECONDS: ${JWT_KEY_ROTATION_INTERVAL_SECONDS:-3600}
+      JWT_CLOCK_SKEW_SECONDS: ${JWT_CLOCK_SKEW_SECONDS:-5}
+      JWKS_URL: ${JWKS_URL:-http://127.0.0.1:8000/.well-known/jwks.json}
+      IDENTITY_REFRESH_TOKEN_TTL_SECONDS:
+      IDENTITY_VERIFICATION_TOKEN_TTL_SECONDS:
+      IDENTITY_PASSWORD_RESET_TOKEN_TTL_SECONDS:
+      SMTP_HOST:
+      SMTP_PORT:
+      IDENTITY_EMAIL_FROM:
+      BFF_PUBLIC_ORIGIN: ${BFF_PUBLIC_ORIGIN:?Set BFF_PUBLIC_ORIGIN to the frontend HTTPS origin}
+      WEBAUTHN_RP_ID:
+      WEBAUTHN_RP_NAME:
+      WEBAUTHN_ORIGIN:
+    ports:
+      - "127.0.0.1:8000:8000"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; response = urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3); raise SystemExit(response.status != 200)"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    stop_grace_period: 20s
+
+  bff:
+    build:
+      context: ../..
+      dockerfile: apps/server/bff/dockerfile
+    restart: unless-stopped
+    init: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+        restart: true
+      identity:
+        condition: service_healthy
+        restart: true
+    environment:
+      BFF_DB_URL: ${BFF_DB_URL:?Set BFF_DB_URL using bff_app and postgres:5432/bff}
+      BFF_PUBLIC_ORIGIN: ${BFF_PUBLIC_ORIGIN:?Set BFF_PUBLIC_ORIGIN to the frontend HTTPS origin}
+      BFF_IDENTITY_BASE_URL: http://identity:8000
+      BFF_SESSION_HMAC_KEY: ${BFF_SESSION_HMAC_KEY:?Set BFF_SESSION_HMAC_KEY}
+      BFF_TOKEN_ENCRYPTION_KEYS: ${BFF_TOKEN_ENCRYPTION_KEYS:?Set BFF_TOKEN_ENCRYPTION_KEYS}
+      BFF_UPSTREAMS:
+      BFF_SESSION_TTL_SECONDS:
+      BFF_SESSION_IDLE_SECONDS:
+      BFF_REFRESH_MARGIN_SECONDS:
+      BFF_CLEANUP_INTERVAL_SECONDS:
+      BFF_SESSION_RETENTION_SECONDS:
+      BFF_MAX_REQUEST_BYTES:
+      BFF_MAX_RESPONSE_BYTES:
+      # BFF has no published port; Nginx overwrites forwarded headers.
+      FORWARDED_ALLOW_IPS: "*"
+    expose:
+      - "8001"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; response = urllib.request.urlopen('http://127.0.0.1:8001/ready', timeout=3); raise SystemExit(response.status != 200)"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    stop_grace_period: 20s
+
+  nginx:
+    build:
+      context: ../..
+      dockerfile: infra/nginx/dockerfile
+    restart: unless-stopped
+    init: true
+    depends_on:
+      bff:
+        condition: service_healthy
+        restart: true
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN to the public frontend hostname}
+      BFF_SERVER_URL: http://bff:8001
+      SSL_CERT_PATH: /etc/nginx/certs/tls.crt
+      SSL_KEY_PATH: /etc/nginx/certs/tls.key
+    ports:
+      - "${HTTPS_PORT:-443}:8443"
+    volumes:
+      - type: bind
+        source: ${NGINX_CERTS_DIR:?Set NGINX_CERTS_DIR to the absolute TLS certificate directory}
+        target: /etc/nginx/certs
+        read_only: true
+        bind:
+          create_host_path: false
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+      - /var/cache/nginx:rw,noexec,nosuid,size=16m,uid=101,gid=101
+      - /etc/nginx/conf.d:rw,noexec,nosuid,size=1m,uid=101,gid=101
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    stop_grace_period: 20s
+
+volumes:
+  postgres_data:

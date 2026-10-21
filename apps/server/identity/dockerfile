@@ -1,0 +1,65 @@
+FROM python:3.13-slim AS builder
+
+COPY --from=ghcr.io/astral-sh/uv:0.11.19 /uv /usr/local/bin/uv
+
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never
+
+WORKDIR /app
+
+# Workspace metadata
+COPY apps/server/pyproject.toml apps/server/uv.lock ./
+
+# All workspace metadata is needed to read the lockfile.
+COPY apps/server/identity/pyproject.toml ./identity/pyproject.toml
+COPY apps/server/lib/auth-token/pyproject.toml ./lib/auth-token/pyproject.toml
+COPY apps/server/lib/authz-helper/pyproject.toml ./lib/authz-helper/pyproject.toml
+COPY apps/server/migrations/pyproject.toml ./migrations/pyproject.toml
+COPY apps/server/bff/pyproject.toml ./bff/pyproject.toml
+COPY apps/server/lib/email-delivery/pyproject.toml ./lib/email-delivery/pyproject.toml
+
+# Install third-party dependencies first
+RUN uv sync \
+    --frozen \
+    --no-dev \
+    --package identity \
+    --no-install-workspace
+
+# Copy actual source
+COPY apps/server/identity/src ./identity/src
+COPY apps/server/identity/README.md ./identity/README.md
+COPY apps/server/lib/auth-token/src ./lib/auth-token/src
+COPY apps/server/lib/auth-token/README.md ./lib/auth-token/README.md
+COPY apps/server/lib/authz-helper/src ./lib/authz-helper/src
+COPY apps/server/lib/authz-helper/README.md ./lib/authz-helper/README.md
+COPY apps/server/lib/email-delivery/src ./lib/email-delivery/src
+COPY apps/server/lib/email-delivery/README.md ./lib/email-delivery/README.md
+
+# Install only identity and its dependencies, without source-directory links.
+RUN uv sync \
+    --locked \
+    --no-dev \
+    --package identity \
+    --no-editable
+
+
+FROM python:3.13-slim AS runner
+
+RUN groupadd --gid 10001 identity \
+    && useradd --uid 10001 --gid identity --no-create-home --shell /usr/sbin/nologin identity
+
+WORKDIR /app
+
+COPY --from=builder /app/.venv /app/.venv
+
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+USER identity
+
+EXPOSE 8000
+
+ENTRYPOINT ["uvicorn", "identity.main:app"]
+CMD ["--host", "0.0.0.0", "--port", "8000"]
